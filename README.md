@@ -3,6 +3,6 @@
 นักศึกษา มหาวิทยาลัยเกษตรศาสตร์ กำแพงแสน\
 คณะศิลปศาสตร์และวิทยาศาสตร์ สาขาวิทยาการคอมพิวเตอร์
 ## Interactive Computer Graphics
-[คลิกเพื่อเข้าชม]([700_Transformation.html)
+[คลิกเพื่อเข้าชม](700_Transformation.html)
 ## Paint
-[คลิกเพื่อเข้าชม]([paint.html)
+[คลิกเพื่อเข้าชม](paint.html)
