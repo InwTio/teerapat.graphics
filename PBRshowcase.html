@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>PBR Showcase</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+        }
+        #lightGUI {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.75);
+            padding: 10px;
+            border-radius: 5px;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+        #lightGUI select,
+        #lightGUI input {
+            width: 150px;
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <!-- core three.js -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/EXRLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/lights/RectAreaLightUniformsLib.js"></script>
+
+    <div id="lightGUI">
+        <select id="lightSelect">
+            <option value="point">Point Light</option>
+            <option value="spot">Spot Light</option>
+            <option value="directional">Directional Light</option>
+            <option value="area">Area Light</option>
+        </select>
+        <br>
+        <input id="lightIntensity" type="number" min="0" step="0.1" value="1">
+    </div>
+
+    <script>
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true; // Shadow
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.body.appendChild(renderer.domElement);
+        const scene = new THREE.Scene();
+
+        const camera = new THREE.PerspectiveCamera(
+            75,
+            window.innerWidth / window.innerHeight,
+            0.1,
+            1000
+        );
+        camera.position.set(0, 2, 5);
+        camera.lookAt(0, 0, 0);
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+
+        const ambientLight = new THREE.AmbientLight(0x404040, .5);
+        scene.add(ambientLight);
+        scene.background = new THREE.Color(0x96fffa);
+        scene.fog = new THREE.Fog(0x0d1010, 1, 10);
+
+/*
+        //skybox
+        const loader = new THREE.CubeTextureLoader();
+        const skybox = loader.setPath('https://raw.githubusercontent.com/mrdoob/three.js/r128/examples/textures/cube/Bridge2/').load([
+            'posx.jpg', 'negx.jpg',
+            'posy.jpg', 'negy.jpg',
+            'posz.jpg', 'negz.jpg'
+        ]);
+        skybox.encoding = THREE.sRGBEncoding;
+        scene.background = skybox;
+        scene.environment = skybox;
+*/
+
+// Panoramic 360-degree EXR skybox
+        const exrSkyboxUrl = 'https://dl.polyhaven.org/file/ph-assets/HDRIs/exr/1k/mossy_forest_1k.exr';
+        const pmremGenerator = new THREE.PMREMGenerator(renderer);
+        pmremGenerator.compileEquirectangularShader();
+        new THREE.EXRLoader()
+            .setDataType(THREE.UnsignedByteType)
+            .load(exrSkyboxUrl, (texture) => {
+                const skybox = pmremGenerator.fromEquirectangular(texture).texture;
+                scene.background = skybox;
+                scene.environment = skybox;
+                texture.dispose();
+                pmremGenerator.dispose();
+            }, undefined, (error) => {
+                console.error('Unable to load EXR skybox:', error);
+            });
+        //
+        let model2;
+        const loader2 = new THREE.GLTFLoader();
+        loader2.load('https://inwtio.github.io/teerapat.graphics/bearMuscular2.glb', (gltf) => {
+            model2 = gltf.scene;
+            model2.traverse((child) => {
+                if (child.isMesh) {
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+                }
+            });
+            model2.position.set(0, 0, 0);
+            //model2.scale.set(2, 2, 2);
+            scene.add(model2);
+        });
+        const loader = new THREE.GLTFLoader();
+        loader.load('https://inwtio.github.io/teerapat.graphics/stylized_pine_tree_tree.glb', (gltf) => {
+            const model = gltf.scene;
+            model.traverse((child) => {
+                if (child.isMesh) {
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+                }
+            });
+
+            const tree1 = model;
+            tree1.position.set(4, -1.8, 5);
+            tree1.scale.set(0.03, 0.03, 0.03);
+            scene.add(tree1);
+
+            const tree2 = model.clone(true);
+            tree2.position.set(-4, -1.8, 5);
+            tree2.scale.copy(tree1.scale);
+            scene.add(tree2);
+
+            const tree3 = model.clone(true);
+            tree3.position.set(0, -1.8, -7);
+            tree3.scale.copy(tree1.scale);
+            scene.add(tree3);
+
+            const tree4 = model.clone(true);
+            tree4.position.set(5, -1.8, -3);
+            tree4.scale.copy(tree1.scale);
+            scene.add(tree4);
+
+            const tree5 = model.clone(true);    
+            tree5.position.set(-5, -1.8, -3);
+            tree5.scale.copy(tree1.scale);
+            scene.add(tree5);
+        });
+      
+        const texFloor = new THREE.TextureLoader().load('https://inwtio.github.io/teerapat.graphics/forest_ground_06_diff_1k.jpg', t => {
+        });
+        const matFloor = new THREE.MeshStandardMaterial({
+            map: texFloor
+        });
+        const planeGeometry = new THREE.PlaneGeometry(20,20);
+        const plane = new THREE.Mesh(planeGeometry, matFloor);
+        plane.rotation.x = -Math.PI / 2;
+        plane.receiveShadow = true;
+        plane.position.y = -1.70;
+        scene.add(plane);
+
+        THREE.RectAreaLightUniformsLib.init();
+
+        const mousePointLight = new THREE.PointLight(0xffffff, 1);
+        mousePointLight.position.set(0, 2, 3);
+        mousePointLight.castShadow = true;
+        scene.add(mousePointLight);
+
+        const mouseSpotLight = new THREE.SpotLight(0xffffff, 1);
+        mouseSpotLight.position.set(0, 2, 3);
+        mouseSpotLight.angle = Math.PI / 6;
+        mouseSpotLight.castShadow = true;
+        mouseSpotLight.target.position.set(0, 0, 0);
+        scene.add(mouseSpotLight);
+        scene.add(mouseSpotLight.target);
+
+        const mouseDirectionalLight = new THREE.DirectionalLight(0xffffff, 1);
+        mouseDirectionalLight.position.set(0, 2, 3);
+        mouseDirectionalLight.castShadow = true;
+        scene.add(mouseDirectionalLight);
+
+        const mouseAreaLight = new THREE.RectAreaLight(0xffffff, 1, 2, 2);
+        mouseAreaLight.position.set(0, 2, 3);
+        mouseAreaLight.lookAt(0, 0, 0);
+        scene.add(mouseAreaLight);
+
+        mouseSpotLight.visible = false;
+        mouseDirectionalLight.visible = false;
+        mouseAreaLight.visible = false;
+
+        const mouseLights = {
+            point: mousePointLight,
+            spot: mouseSpotLight,
+            directional: mouseDirectionalLight,
+            area: mouseAreaLight
+        };
+
+        let selectedMouseLight = mousePointLight;
+        let targetLightPosition = mousePointLight.position.clone();
+
+        const lightSelect = document.getElementById('lightSelect');
+        const lightIntensity = document.getElementById('lightIntensity');
+
+        lightSelect.addEventListener('change', function() {
+            mousePointLight.visible = false;
+            mouseSpotLight.visible = false;
+            mouseDirectionalLight.visible = false;
+            mouseAreaLight.visible = false;
+            selectedMouseLight = mouseLights[this.value];
+            selectedMouseLight.visible = true;
+            targetLightPosition.copy(selectedMouseLight.position);
+            lightIntensity.value = selectedMouseLight.intensity;
+        });
+
+        lightIntensity.addEventListener('input', function() {
+            const value = parseFloat(this.value);
+            if (!isNaN(value)) {
+                selectedMouseLight.intensity = value;
+            }
+        });
+
+        const lightRaycaster = new THREE.Raycaster();
+        const lightMouse = new THREE.Vector2();
+        const mouseWorldPosition = new THREE.Vector3();
+        const mouseLightPlane = new THREE.Plane();
+        const cameraDirection = new THREE.Vector3();
+
+        renderer.domElement.addEventListener('pointermove', function(event) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            lightMouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            lightMouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+            lightRaycaster.setFromCamera(lightMouse, camera);
+
+            camera.getWorldDirection(cameraDirection);
+            mouseLightPlane.setFromNormalAndCoplanarPoint(
+                cameraDirection,
+                selectedMouseLight.position
+            );
+
+            if (lightRaycaster.ray.intersectPlane(mouseLightPlane, mouseWorldPosition)) {
+                targetLightPosition.copy(mouseWorldPosition);
+            }
+        });
+
+        window.addEventListener('resize', function() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        function animate(t) {
+            if (model2) {
+                model2.rotation.y += 0.01;
+            }
+
+            selectedMouseLight.position.lerp(targetLightPosition, 0.25);
+
+            if (selectedMouseLight === mouseAreaLight) {
+                mouseAreaLight.lookAt(0, 0, 0);
+            }
+
+            renderer.render(scene, camera);
+            requestAnimationFrame(animate);
+        }
+        animate(0);
+        window.addEventListener('keydown', (event) => {
+        });
+        //
+    </script>
+</body>
+</html>
