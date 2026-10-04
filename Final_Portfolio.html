@@ -2,7 +2,7 @@
 <html>
 
 <head>
-    <title>Portfolio</title>
+    <title>Scene</title>
     <style>
         body {
             margin: 0;
@@ -12,6 +12,10 @@
 </head>
 
 <body>
+    <audio id="bgMusic" loop preload="auto">
+        <source src="https://inwtio.github.io/teerapat.graphics/kuanlook.mp3" type="audio/mpeg">
+    </audio>
+
     <!-- core three.js -->
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
@@ -19,6 +23,16 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/EXRLoader.js"></script>
     <script>
+
+        const bgMusic = document.getElementById('bgMusic');
+        bgMusic.volume = 1.00;
+
+        const enableMusic = () => {
+            if (!bgMusic) return;
+            bgMusic.play().catch(() => {});
+        };
+
+        document.addEventListener('click', enableMusic, { once: true });
 
         const renderer = new THREE.WebGLRenderer();
         renderer.setSize(window.innerWidth, window.innerHeight);
@@ -86,6 +100,7 @@
 
         let scene1;
         const animationMixers = [];
+        const fallbackAnimatedModels = [];
         const clock = new THREE.Clock();
         const pickables = [];
         const nonPickableNames = new Set([
@@ -99,13 +114,23 @@
         });
 
         function attachAnimations(model, gltf) {
-            if (!gltf || !gltf.animations || gltf.animations.length === 0) {
+            if (!gltf) {
+                return null;
+            }
+
+            console.log('Loaded GLTF with animation clips:', gltf.animations ? gltf.animations.length : 0, 'for model:', model.name || 'unnamed');
+
+            if (!gltf.animations || gltf.animations.length === 0) {
+                model.userData.fallbackRotateSpeed = 0.01;
+                fallbackAnimatedModels.push(model);
                 return null;
             }
 
             const mixer = new THREE.AnimationMixer(model);
             gltf.animations.forEach((clip) => {
-                mixer.clipAction(clip).play();
+                const action = mixer.clipAction(clip);
+                action.setLoop(THREE.LoopRepeat);
+                action.play();
             });
             animationMixers.push(mixer);
             return mixer;
@@ -327,6 +352,22 @@
         const hitMesh = hit.object;
         console.log('Clicked Mesh Name:', hitMesh.name);
 
+        if (hitMesh.name === 'Screenshot_2026-10-04_125950') {
+            picked_object = hitMesh;
+            window.open('https://inwtio.github.io/teerapat.graphics/700_Transformation.html', '_blank');
+            return;
+        }
+        if (hitMesh.name === 'Screenshot_2026-10-04_133951') {
+            picked_object = hitMesh;
+            window.open('https://inwtio.github.io/teerapat.graphics/PBRshowcase.html', '_blank');
+            return;
+        }
+        if (hitMesh.name === 'Screenshot_2026-10-04_133802') {
+            picked_object = hitMesh;
+            window.open('https://inwtio.github.io/teerapat.graphics/paint.html', '_blank');
+            return;
+        }
+
         let current = hitMesh;
         while (current && current !== scene) {
             const targetName = customTargetMap[current.name];
@@ -335,6 +376,12 @@
                 if (target) {
                     picked_object = target;
                     console.log('Matched sign click -> target:', picked_object.name);
+
+                    const url = targetUrlMap[targetName];
+                    if (url) {
+                        window.open(url, '_blank');
+                    }
+
                     return;
                 }
             }
@@ -379,7 +426,10 @@
     });
 
         function animate(t) {
-            animationMixers.forEach((mixer) => mixer.update(clock.getDelta()));
+            const delta = clock.getDelta();
+            animationMixers.forEach((mixer) => mixer.update(delta));
+
+           
 
             if (picked_object != null) {
                 controls.target.lerp(picked_object.position, 0.1);
