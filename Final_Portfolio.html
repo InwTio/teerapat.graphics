@@ -25,7 +25,7 @@
     <script>
 
         const bgMusic = document.getElementById('bgMusic');
-        bgMusic.volume = 1.00;
+        bgMusic.volume = 0.25;
 
         const enableMusic = () => {
             if (!bgMusic) return;
@@ -376,11 +376,6 @@
                 if (target) {
                     picked_object = target;
                     console.log('Matched sign click -> target:', picked_object.name);
-
-                    const url = targetUrlMap[targetName];
-                    if (url) {
-                        window.open(url, '_blank');
-                    }
 
                     return;
                 }
