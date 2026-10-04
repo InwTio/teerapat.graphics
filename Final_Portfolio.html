@@ -144,6 +144,7 @@
         let interactiveSign = null;
         let paintSign = null;
         let pbrSign = null;
+        let secret = null;
 
         const loaderSceneFinal = new THREE.GLTFLoader();
         loaderSceneFinal.load('https://inwtio.github.io/teerapat.graphics/SceneFinal.glb', (gltf) => {
@@ -291,7 +292,20 @@
                     attachAnimations(pbrSign, gltf);
                     scene.add(pbrSign);
                 });
-
+        const loaderSecret = new THREE.GLTFLoader();
+                loaderPBRSign.load('https://inwtio.github.io/teerapat.graphics/what.glb', (gltf) => {
+                    secret = gltf.scene;
+                    secret.traverse((child) => {
+                        if (child.isMesh) {
+                            child.castShadow = true;
+                            child.receiveShadow = true;
+                            pickables.push(child);
+                        }
+                    });
+                    secret.position.set(0, 0, 0);
+                    attachAnimations(secret, gltf);
+                    scene.add(secret);
+                });
 
 
     const raycaster = new THREE.Raycaster();
@@ -365,6 +379,11 @@
         if (hitMesh.name === 'Screenshot_2026-10-04_133802') {
             picked_object = hitMesh;
             window.open('https://inwtio.github.io/teerapat.graphics/paint.html', '_blank');
+            return;
+        }
+         if (hitMesh.name === 'what') {
+            picked_object = hitMesh;
+            window.open('https://inwtio.github.io/teerapat.graphics/jumpscare.html', '_blank');
             return;
         }
 
