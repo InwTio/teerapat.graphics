@@ -1,14 +1,401 @@
+<!DOCTYPE html>
 <html>
-    <head>
-        <title>Scene</title>
-        <style>
-            body {
-                margin: 0;
-                overflow: hidden;
+
+<head>
+    <title>Portfolio</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- core three.js -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
+      <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/EXRLoader.js"></script>
+    <script>
+
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true; // Shadow
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.body.appendChild(renderer.domElement);
+
+        const scene = new THREE.Scene();
+
+        
+        const camera = new THREE.PerspectiveCamera(
+            75,
+            window.innerWidth / window.innerHeight,
+            0.1,
+            1000
+        );
+        camera.position.set(0, 2, 5);
+        camera.lookAt(0, 0, 0);
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+
+
+       const ambientLight = new THREE.AmbientLight(0xF0F8FF, .5);
+        scene.add(ambientLight);
+
+        const topSpotLight = new THREE.SpotLight(0xffffff, 2.5, 40, Math.PI / 4, 0.4, 1.5);
+        topSpotLight.position.set(0, 8, 0);
+        topSpotLight.target.position.set(0, 0, 0);
+        topSpotLight.castShadow = true;
+        scene.add(topSpotLight);
+        scene.add(topSpotLight.target);
+
+        scene.background = new THREE.Color(0xFFFFFF);
+
+        scene.fog = new THREE.Fog(0xF0F8FF, 1, 40);
+/*
+        //skybox
+        const loader = new THREE.CubeTextureLoader();
+        const skybox = loader.setPath('https://raw.githubusercontent.com/mrdoob/three.js/r128/examples/textures/cube/Bridge2/').load([
+            'posx.jpg', 'negx.jpg',
+            'posy.jpg', 'negy.jpg',
+            'posz.jpg', 'negz.jpg'
+        ]);
+        skybox.encoding = THREE.sRGBEncoding;
+        scene.background = skybox;
+        scene.environment = skybox;
+*/
+// Panoramic 360-degree EXR skybox
+       // const exrSkyboxUrl = 'https://dl.polyhaven.org/file/ph-assets/HDRIs/exr/1k/shady_patch_1k.exr';
+       // const pmremGenerator = new THREE.PMREMGenerator(renderer);
+       // pmremGenerator.compileEquirectangularShader();
+//
+       // new THREE.EXRLoader()
+       //     .setDataType(THREE.UnsignedByteType)
+       //     .load(exrSkyboxUrl, (texture) => {
+       //         const skybox = pmremGenerator.fromEquirectangular(texture).texture;
+       //         scene.background = skybox;
+       //         scene.environment = skybox;
+//
+      //          texture.dispose();
+      //          pmremGenerator.dispose();
+      //      }, undefined, (error) => {
+      //          console.error('Unable to load EXR skybox:', error);
+      //      });
+
+
+        let scene1;
+        const animationMixers = [];
+        const clock = new THREE.Clock();
+        const pickables = [];
+        const nonPickableNames = new Set([
+            // Add GLB object names here, for example: 'Floor'
+        ]);
+
+        const defaultPickMaterial = new THREE.MeshStandardMaterial({ color: 0xFFFFFF });
+        const defaultOutlineMaterial = new THREE.MeshBasicMaterial({
+            color: 0x000000,
+            side: THREE.BackSide
+        });
+
+        function attachAnimations(model, gltf) {
+            if (!gltf || !gltf.animations || gltf.animations.length === 0) {
+                return null;
             }
-        </style>
-    </head>
-    <body>
-        //
-    </body>
+
+            const mixer = new THREE.AnimationMixer(model);
+            gltf.animations.forEach((clip) => {
+                mixer.clipAction(clip).play();
+            });
+            animationMixers.push(mixer);
+            return mixer;
+        }
+
+        let paintBlock = null;
+        let interactiveBlock = null;
+        let pbrBlock = null;
+        let sceneFinal = null;
+        let middleWood = null;
+        let interactiveSign = null;
+        let paintSign = null;
+        let pbrSign = null;
+
+        const loaderSceneFinal = new THREE.GLTFLoader();
+        loaderSceneFinal.load('https://inwtio.github.io/teerapat.graphics/SceneFinal.glb', (gltf) => {
+            sceneFinal = gltf.scene;
+            sceneFinal.traverse((child) => {
+                if (child.isMesh) {
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+                }
+            });
+            sceneFinal.position.set(0, 0, 0);
+            attachAnimations(sceneFinal, gltf);
+            scene.add(sceneFinal);
+        });
+
+        const loaderPaintBlock = new THREE.GLTFLoader();
+        loaderPaintBlock.load('https://inwtio.github.io/teerapat.graphics/PaintBlock.glb', (gltf) => {
+            paintBlock = gltf.scene;
+            paintBlock.traverse((child) => {
+                if (child.isMesh) {
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+                    pickables.push(child);
+                }
+            });
+            paintBlock.position.set(0, 0, 0);
+            attachAnimations(paintBlock, gltf);
+            scene.add(paintBlock);
+        });
+
+        const loaderInfoText = new THREE.GLTFLoader();
+        loaderInfoText.load('https://inwtio.github.io/teerapat.graphics/InfoText.glb', (gltf) => {
+            infoText = gltf.scene;
+            infoText.traverse((child) => {
+                if (child.isMesh) {
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+                    pickables.push(child);
+                }
+            });
+            infoText.position.set(0, 0, 0);
+            attachAnimations(infoText, gltf);
+            scene.add(infoText);
+        });
+
+        const loaderInteractiveBlock = new THREE.GLTFLoader();
+        loaderInteractiveBlock.load('https://inwtio.github.io/teerapat.graphics/InteractiveBlock.glb', (gltf) => {
+            interactiveBlock = gltf.scene;
+            interactiveBlock.traverse((child) => {
+                if (child.isMesh) {
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+                     pickables.push(child);
+                }
+            });
+            interactiveBlock.position.set(0, 0, 0);
+            attachAnimations(interactiveBlock, gltf);
+            scene.add(interactiveBlock);
+        });
+
+        const loaderPBRblock = new THREE.GLTFLoader();
+        loaderPBRblock.load('https://inwtio.github.io/teerapat.graphics/PBRblock.glb', (gltf) => {
+            pbrBlock = gltf.scene;
+            pbrBlock.traverse((child) => {
+                if (child.isMesh) {
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+                    pickables.push(child);
+                }
+            });
+            pbrBlock.position.set(0, 0, 0);
+            attachAnimations(pbrBlock, gltf);
+            scene.add(pbrBlock);
+        });
+
+        const loaderMiddleWood = new THREE.GLTFLoader();
+        loaderMiddleWood.load('https://inwtio.github.io/teerapat.graphics/MiddleWood.glb', (gltf) => {
+            middleWood = gltf.scene;
+            middleWood.traverse((child) => {
+                if (child.isMesh) {
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+                }
+            });
+            middleWood.position.set(0, 0, 0);
+            attachAnimations(middleWood, gltf);
+            scene.add(middleWood);
+        });
+
+        const loaderInteractiveSign = new THREE.GLTFLoader();
+        loaderInteractiveSign.load('https://inwtio.github.io/teerapat.graphics/InteractiveSign.glb', (gltf) => {
+            interactiveSign = gltf.scene;
+            interactiveSign.traverse((child) => {
+                if (child.isMesh) {
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+                    pickables.push(child);
+                }
+            });
+            interactiveSign.position.set(0, 0, 0);
+            attachAnimations(interactiveSign, gltf);
+            scene.add(interactiveSign);
+        });
+
+        const loaderPaintSign = new THREE.GLTFLoader();
+        loaderPaintSign.load('https://inwtio.github.io/teerapat.graphics/PaintSign.glb', (gltf) => {
+            paintSign = gltf.scene;
+            paintSign.traverse((child) => {
+                if (child.isMesh) {
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+                    pickables.push(child);
+                }
+            });
+            paintSign.position.set(0, 0, 0);
+            attachAnimations(paintSign, gltf);
+            scene.add(paintSign);
+        });
+
+        const loaderPBRSign = new THREE.GLTFLoader();
+        loaderPBRSign.load('https://inwtio.github.io/teerapat.graphics/PBRSign.glb', (gltf) => {
+            pbrSign = gltf.scene;
+            pbrSign.traverse((child) => {
+                if (child.isMesh) {
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+                    pickables.push(child);
+                }
+            });
+            pbrSign.position.set(0, 0, 0);
+            attachAnimations(pbrSign, gltf);
+            scene.add(pbrSign);
+        });
+        const loaderProfileSign = new THREE.GLTFLoader();
+                loaderPBRSign.load('https://inwtio.github.io/teerapat.graphics/ProfileSign.glb', (gltf) => {
+                    pbrSign = gltf.scene;
+                    pbrSign.traverse((child) => {
+                        if (child.isMesh) {
+                            child.castShadow = true;
+                            child.receiveShadow = true;
+                            pickables.push(child);
+                        }
+                    });
+                    pbrSign.position.set(0, 0, 0);
+                    attachAnimations(pbrSign, gltf);
+                    scene.add(pbrSign);
+                });
+
+
+
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+    let picked_object = null;
+
+    const customTargetMap = {
+        'Cube002': 'Interactive',
+        'Cube002_1': 'Interactive',
+
+        'Cube_1': 'PBRshowcase',
+        'Cube': 'PBRshowcase',
+
+        'Profile002': 'Paint',
+        'Profile002_1': 'Paint',
+
+        'Cube003': 'Info',
+        'Cube003_1': 'Info'
+    };
+
+    function normalizeName(name) {
+        return String(name || '').toLowerCase().replace(/[.\s_]/g, '');
+    }
+
+    function findObjectByName(root, name) {
+        let match = null;
+        root.traverse((object) => {
+            if (!match && normalizeName(object.name) === normalizeName(name)) {
+                match = object;
+            }
+        });
+        return match;
+    }
+
+    renderer.domElement.addEventListener('click', onPick);
+    function onPick(e) {
+        const r = renderer.domElement.getBoundingClientRect();
+        const clientX = e.clientX ?? (e.touches && e.touches[0] ? e.touches[0].clientX : null);
+        const clientY = e.clientY ?? (e.touches && e.touches[0] ? e.touches[0].clientY : null);
+
+        if (clientX === null || clientY === null) {
+            return;
+        }
+
+        const x = clientX - r.left;
+        const y = clientY - r.top;
+        pointer.x = (x / r.width) * 2 - 1;
+        pointer.y = -(y / r.height) * 2 + 1;
+
+        raycaster.setFromCamera(pointer, camera);
+        const hit = raycaster.intersectObjects(pickables, true)[0];
+
+        if (!hit) {
+            picked_object = null;
+            return;
+        }
+
+        const hitMesh = hit.object;
+        console.log('Clicked Mesh Name:', hitMesh.name);
+
+        let current = hitMesh;
+        while (current && current !== scene) {
+            const targetName = customTargetMap[current.name];
+            if (targetName) {
+                const target = findObjectByName(scene, targetName);
+                if (target) {
+                    picked_object = target;
+                    console.log('Matched sign click -> target:', picked_object.name);
+                    return;
+                }
+            }
+            current = current.parent;
+        }
+
+        picked_object = hitMesh;
+        console.log('Picked GLB object:', picked_object.name || '(unnamed mesh)');
+    }
+
+    function addPickableObject(name, geometry, position) {
+        const mesh = new THREE.Mesh(geometry, defaultPickMaterial);
+        scene.add(mesh);
+        mesh.name = name;
+        mesh.position.copy(position);
+        pickables.push(mesh);
+        
+        const outlineMesh = new THREE.Mesh(geometry, defaultOutlineMaterial);
+        scene.add(outlineMesh);
+        outlineMesh.position.copy(position);
+        mesh.add(outlineMesh);
+
+        return mesh;
+    }
+
+  //  addPickableObject('TorusKnot', new THREE.TorusKnotBufferGeometry(0.5, 0.2, 128, 32), new THREE.Vector3(0, 0, 0));
+   // addPickableObject('Cube', new THREE.BoxBufferGeometry(1.0, 1.0, 1.0), new THREE.Vector3(-2, 0, 0));
+   // const sphere = addPickableObject('Sphere', new THREE.SphereBufferGeometry(0.6, 32, 32), new THREE.Vector3(2, 0, 0));
+   // const cone = addPickableObject('Cone', new THREE.ConeBufferGeometry(0.5, 1.0, 32), new THREE.Vector3(0, 0, 2));
+   // const cylinder = addPickableObject('Cylinder', new THREE.CylinderBufferGeometry(0.3, 0.3, 1.0, 32), new THREE.Vector3(0, 0, -2));
+
+    function lerp(a, b, t) {
+        //return a * (1 - t) + b * t;
+        return (1.0 - t) * a + t * b;
+    }
+
+    addEventListener('resize', () => {
+        camera.aspect = innerWidth / innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(innerWidth, innerHeight);
+        renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    });
+
+        function animate(t) {
+            animationMixers.forEach((mixer) => mixer.update(clock.getDelta()));
+
+            if (picked_object != null) {
+                controls.target.lerp(picked_object.position, 0.1);
+            }
+
+            controls.update();
+            renderer.render(scene, camera);
+            requestAnimationFrame(animate);
+        }
+        animate(0);
+
+        window.addEventListener('keydown', (event) => {
+
+        });
+
+    </script>
+</body>
+
 </html>
