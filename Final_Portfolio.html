@@ -97,7 +97,92 @@
       //          console.error('Unable to load EXR skybox:', error);
       //      });
 
+ const uniforms = {
+    uTime: { value: 0.0 },
+    uWaveAmplitude: { value: 0.0 },
+    uLightDir: { value: new THREE.Vector3(0.5, 0.5, 1.0).normalize() },
+    uBaseColor: { value: new THREE.Vector3(0.05, 1.0, 0.1) },
+    uTopColor: { value: new THREE.Vector3(0.05, 1.0, 0.1) },
+    uBottomColor: { value: new THREE.Vector3(0.45, 0.22, 0.08) },
+    uColorSplit: { value: 0.95 },
+    uUseHeightColors: { value: 0.0 },
+    uTexture: { value: new THREE.TextureLoader().load('https://threejs.org/examples/textures/uv_grid_opengl.jpg') },
+    //uTexture: { value: new THREE.TextureLoader().load('https://inwtio.github.io/teerapat.graphics/tu.jpg') }
+  };
 
+  const vertexShader = `
+    uniform float uTime;
+    uniform float uWaveAmplitude;
+    varying vec2 vUv;
+    varying vec3 vNormal;
+    varying vec3 vPosW;
+
+    void main() {
+      vUv = uv;
+      vNormal = normal;
+      vPosW = position;
+
+      vec3 pos = position;
+      pos.z += sin(pos.x * 5.0 + uTime * 2.0) * uWaveAmplitude;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+    }
+  `;
+
+  const fragmentShader = `
+
+    precision mediump float;
+    uniform sampler2D uTexture;
+    uniform vec3 uLightDir;
+    uniform vec3 uBaseColor;
+    uniform vec3 uTopColor;
+    uniform vec3 uBottomColor;
+    uniform float uColorSplit;
+    uniform float uUseHeightColors;
+    varying vec2 vUv;
+    varying vec3 vNormal;
+    varying vec3 vPosW;
+
+    void main() {
+      // เริ่มเขียน fragment shader ที่นี่
+      //vec3 color = vec3(vUv, 0.5);
+     // vec3 color = vec3(1.0, 0.3, 0.0);
+    //vec3 basecolor = texture2D(uTexture, vUv).xyz;
+     vec3 N = normalize(vNormal);
+     vec3 L = normalize(uLightDir);
+
+    // Lambert diffuse
+    float diffuse = max(dot(N,L), 0.0);
+    float level = 5.0;
+    diffuse = floor(diffuse * level) / level;
+
+    // Ambient light
+    float ambient = 0.3;
+      
+     // Phong specular
+     vec3 R = reflect(-L, N);
+     vec3 V = normalize(cameraPosition - vPosW);
+     float specular = pow(max(dot(R, V), 0.0), 4.0) * 0.9;
+     specular = floor(specular * 4.0) / 4.0;
+     //specular = step(0.7, specular);
+     specular = smoothstep(0.1, 0.4, specular);
+
+
+    float topMask = smoothstep(uColorSplit - 0.05, uColorSplit + 0.05, vPosW.y);
+    vec3 heightColor = mix(uBottomColor, uTopColor, topMask);
+    vec3 baseColor = mix(uBaseColor, heightColor, uUseHeightColors);
+    vec3 color = baseColor * (diffuse + ambient) + vec3(specular);
+
+
+
+      gl_FragColor = vec4(color, 1.0);
+    }
+  `;
+         const material = new THREE.ShaderMaterial({
+            vertexShader,
+            fragmentShader,
+            uniforms,
+            side: THREE.DoubleSide
+        });
         let scene1;
         const animationMixers = [];
         const fallbackAnimatedModels = [];
@@ -145,6 +230,8 @@
         let paintSign = null;
         let pbrSign = null;
         let secret = null;
+        let beem = null;
+        let TreeShade = null;
 
         const loaderSceneFinal = new THREE.GLTFLoader();
         loaderSceneFinal.load('https://inwtio.github.io/teerapat.graphics/SceneFinal.glb', (gltf) => {
@@ -223,10 +310,13 @@
         const loaderMiddleWood = new THREE.GLTFLoader();
         loaderMiddleWood.load('https://inwtio.github.io/teerapat.graphics/MiddleWood.glb', (gltf) => {
             middleWood = gltf.scene;
+            const middleWoodMaterial = material.clone();
+            middleWoodMaterial.uniforms.uBaseColor.value.set(0.45, 0.22, 0.08);
             middleWood.traverse((child) => {
                 if (child.isMesh) {
                     child.castShadow = true;
                     child.receiveShadow = true;
+                    child.material = middleWoodMaterial;
                 }
             });
             middleWood.position.set(0, 0, 0);
@@ -278,6 +368,7 @@
             attachAnimations(pbrSign, gltf);
             scene.add(pbrSign);
         });
+
         const loaderProfileSign = new THREE.GLTFLoader();
                 loaderPBRSign.load('https://inwtio.github.io/teerapat.graphics/ProfileSign.glb', (gltf) => {
                     pbrSign = gltf.scene;
@@ -292,6 +383,7 @@
                     attachAnimations(pbrSign, gltf);
                     scene.add(pbrSign);
                 });
+
         const loaderSecret = new THREE.GLTFLoader();
                 loaderPBRSign.load('https://inwtio.github.io/teerapat.graphics/what.glb', (gltf) => {
                     secret = gltf.scene;
@@ -307,6 +399,40 @@
                     scene.add(secret);
                 });
 
+                const loaderTreeShade = new THREE.GLTFLoader();
+                loaderTreeShade.load('https://inwtio.github.io/teerapat.graphics/TreeShade.glb', (gltf) => {
+                    TreeShade = gltf.scene;
+                    const treeMaterial = material.clone();
+                    treeMaterial.uniforms.uUseHeightColors.value = 1.0;
+                    TreeShade.traverse((child) => {
+                        if (child.isMesh) {
+                            child.castShadow = true;
+                            child.receiveShadow = true;
+                            child.material = treeMaterial;
+                        }
+                    });
+                    TreeShade.position.set(0, 0, 0);
+                    scene.add(TreeShade);
+                });
+
+         const loaderUFObeem= new THREE.GLTFLoader();
+            loaderUFObeem.load('https://inwtio.github.io/teerapat.graphics/UFOFreeze.glb', (gltf) => {
+                beem = gltf.scene;
+                const beemMaterial = material.clone();
+                beemMaterial.uniforms.uTime = uniforms.uTime;
+                beemMaterial.uniforms.uWaveAmplitude.value = 0.35;
+                beem.traverse((child) => {
+                    if (child.isMesh) {
+                        child.castShadow = true;
+                        child.receiveShadow = true;
+                        child.material = beemMaterial;
+                    }
+                });
+                attachAnimations(beem, gltf);
+                scene.add(beem);
+            }, undefined, (error) => {
+                console.error('Unable to load UFObeem.glb:', error);
+            });
 
     const raycaster = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
@@ -441,6 +567,7 @@
 
         function animate(t) {
             const delta = clock.getDelta();
+            uniforms.uTime.value += delta;
             animationMixers.forEach((mixer) => mixer.update(delta));
 
            
